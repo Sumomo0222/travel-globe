@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>环球旅行地图 · 私人旅行档案</title>
+  <meta name="description" content="一座可旋转的 3D 旅行地球：记录去过的国家与城市，按时间连线，附照片、日期、天气与旅行笔记。">
+  <meta name="theme-color" content="#070b18">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23070b18' stroke='%23e9b44c' stroke-width='2'/%3E%3Cpath d='M2 16h28M16 2v28M6 7c6 5 14 5 20 0M6 25c6-5 14-5 20 0' stroke='%23e9b44c' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 装载过渡 -->
+  <div id="loader" class="loader">
+    <div class="loader-compass"></div>
+    <p>正在展开旅行档案<span class="dots">…</span></p>
+  </div>
+
+  <div id="app">
+
+    <!-- 顶栏：标题 + 统计 -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 16h26M16 3v26M7.5 8.5c5 4.5 12 4.5 17 0M7.5 23.5c5-4.5 12-4.5 17 0" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="16" cy="16" r="2.6" fill="currentColor"/></svg>
+        </div>
+        <div class="brand-text">
+          <h1>环球旅行地图</h1>
+          <p class="eyebrow">PERSONAL TRAVEL ARCHIVE · 2019—2026</p>
+        </div>
+      </div>
+      <div class="stats" role="status" aria-label="旅行统计">
+        <div class="stat"><b id="stat-countries">—</b><span>国家</span><i>COUNTRIES</i></div>
+        <div class="stat"><b id="stat-cities">—</b><span>城市</span><i>CITIES</i></div>
+        <div class="stat"><b id="stat-distance">—</b><span>总里程</span><i>KILOMETERS</i></div>
+      </div>
+    </header>
+
+    <!-- 主区：地球 + 侧边时间轴 -->
+    <main class="layout">
+
+      <section class="map-pane" id="map-pane">
+        <div class="filters" id="filters">
+          <div class="filter-row" data-group="year">
+            <span class="filter-label">年份</span>
+            <div class="chips" id="chips-year"></div>
+          </div>
+          <div class="filter-row" data-group="continent">
+            <span class="filter-label">大洲</span>
+            <div class="chips" id="chips-continent"></div>
+          </div>
+          <div class="filter-row" data-group="theme">
+            <span class="filter-label">主题</span>
+            <div class="chips" id="chips-theme"></div>
+          </div>
+        </div>
+
+        <div class="globe-wrap" id="globe-wrap">
+          <canvas id="globe" aria-label="可旋转的3D旅行地球"></canvas>
+        </div>
+
+        <div class="map-hud">
+          <button class="hud-btn" id="btn-reset" title="回到初始视角">⌖<span>复位</span></button>
+          <button class="hud-btn is-on" id="btn-rotate" title="自动自转" aria-pressed="true">⟳<span>自转</span></button>
+          <button class="hud-btn hud-sheet" id="btn-sheet" title="时间轴">☰<span>时间轴</span></button>
+        </div>
+
+        <div class="map-footnote">
+          <span class="hint">🖱 拖拽旋转 · 滚轮缩放 · 点击航线进入故事</span>
+          <span class="seal">环球足迹<span>已归档</span></span>
+        </div>
+
+        <!-- 悬停提示卡 -->
+        <div id="tooltip" class="tooltip" hidden>
+          <img class="tip-photo" alt="">
+          <div class="tip-body">
+            <header>
+              <b class="tip-name"></b>
+              <span class="tip-latin"></span>
+            </header>
+            <div class="tip-meta">
+              <span class="tip-date"></span>
+              <span class="tip-weather"></span>
+            </div>
+            <div class="tip-themes"></div>
+            <p class="tip-note"></p>
+            <footer>点击查看细节 ✦</footer>
+          </div>
+        </div>
+
+        <!-- 国家点击回执 -->
+        <div id="country-toast" class="country-toast" hidden></div>
+      </section>
+
+      <!-- 时间轴 -->
+      <aside class="timeline" id="timeline">
+        <div class="sheet-handle" id="sheet-handle"><i></i></div>
+        <header class="timeline-head">
+          <h2>旅行时间轴</h2>
+          <span>TRAVEL TIMELINE</span>
+        </header>
+        <div class="timeline-body" id="timeline-body"><!-- 由 app.js 渲染 --></div>
+        <footer class="timeline-foot">
+          <p>「世界不在地图上，而在脚下的每一步。」</p>
+        </footer>
+      </aside>
+    </main>
+  </div>
+
+  <!-- 沉浸式故事页 -->
+  <div id="story" class="story" hidden>
+    <div class="story-progress"><i id="story-bar"></i></div>
+    <nav class="story-top">
+      <button class="story-back" id="story-back">← 返回地图</button>
+      <span class="story-crumbs" id="story-crumbs"></span>
+    </nav>
+    <div class="story-scroll" id="story-scroll"></div>
+  </div>
+
+  <noscript><p class="noscript-note">需要启用 JavaScript 才能展开这份旅行档案。</p></noscript>
+
+  <script src="vendor/d3.min.js"></script>
+  <script src="vendor/topojson.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/globe.js"></script>
+  <script src="js/story.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
