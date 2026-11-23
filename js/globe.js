@@ -10,6 +10,8 @@ window.Globe = (function () {
 
   const TAU = Math.PI * 2;
   const DEG = Math.PI / 180;
+  /* 数据层存 [纬度, 经度]；d3 全系 API 需要 [经度, 纬度]，此处统一转换 */
+  const llOf = c => [c.coord[1], c.coord[0]];
 
   class Globe {
     constructor(canvas, cb = {}) {
@@ -68,7 +70,7 @@ window.Globe = (function () {
       trips.forEach((t, ti) => {
         const cs = t.cities;
         for (let i = 0; i < cs.length - 1; i++) {
-          const interp = d3.geoInterpolate(cs[i].coord, cs[i + 1].coord);
+          const interp = d3.geoInterpolate(llOf(cs[i]), llOf(cs[i + 1]));
           const N = 64;
           this.arcs.push({
             trip: t, from: cs[i], to: cs[i + 1],
@@ -106,7 +108,7 @@ window.Globe = (function () {
       this.spin = 0;
     }
     flyToCity(city) { this.flyToCoord(city.coord); }
-    resetView() { this.flyToCoord([105, 28], this.baseScale); }
+    resetView() { this.flyToCoord([28, 105], this.baseScale); }  // [纬度, 经度] → 居中 (105°E, 28°N)
 
     /* ---------- 交互 ---------- */
     _bind() {
@@ -187,12 +189,14 @@ window.Globe = (function () {
     _click(e) {
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      const ll = this.projection.invert([x, y]);
+      // 通用点击回调（编辑器「地图选点」用）
+      if (this.cb.onPoint) this.cb.onPoint(ll && isFinite(ll[0]) ? ll : null, { x, y });
       const hit = this._pick(x, y);
       if (hit && hit.type === 'city') { this.cb.onSelectCity && this.cb.onSelectCity(hit.city); return; }
       if (hit && hit.type === 'arc') { this.cb.onSelectArc && this.cb.onSelectArc(hit.arc.trip); return; }
       // 国家拾取
-      const ll = this.projection.invert([x, y]);
-      if (!ll || !this.world) { this.cb.onCountry && this.cb.onCountry(null); return; }
+      if (!ll || !isFinite(ll[0]) || !this.world) { this.cb.onCountry && this.cb.onCountry(null); return; }
       const f = this.land.find(ft => d3.geoContains(ft, ll));
       if (!f) { this.cb.onCountry && this.cb.onCountry(null); return; }
       const en = f.properties.name;
@@ -427,9 +431,10 @@ window.Globe = (function () {
       list.sort((a, b) => (a === this.activeCity || a === this.hoverCity ? 1 : 0) - (b === this.activeCity || b === this.hoverCity ? 1 : 0));
 
       for (const c of list) {
-        const front = d3.geoDistance(c.coord, center) < Math.PI / 2 - 0.01;
+        const ll = llOf(c);
+        const front = d3.geoDistance(ll, center) < Math.PI / 2 - 0.01;
         c._visible = front;
-        const xy = this.projection(c.coord);
+        const xy = this.projection(ll);
         if (!front || !xy || !isFinite(xy[0])) { c._xy = null; continue; }
         c._xy = xy;
         const col = ATLAS.yearColors[c.trip.year] || '#F2C063';

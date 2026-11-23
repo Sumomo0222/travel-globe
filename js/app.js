@@ -284,6 +284,7 @@
 
   /* ================= 启动 ================= */
   async function boot() {
+    ATLAS.loadSaved();   // 若本浏览器保存过修改，优先使用
     buildChips();
     bindChips(el.chipsYear, state.year, true);
     bindChips(el.chipsContinent, state.continent);
@@ -301,7 +302,13 @@
         selectCity(c);
       },
       onSelectArc(trip) { Story.open(trip.id); },
-      onCountry(info) { showCountry(info); },
+      onCountry(info) {
+        if (Editor.isPicking()) return;
+        showCountry(info);
+      },
+      onPoint(ll) {
+        Editor.consumePick(ll && isFinite(ll[0]) ? [ll[1], ll[0]] : null);  // [lng,lat] → [lat,lng]
+      },
     });
 
     try {
@@ -311,6 +318,11 @@
       console.error(err);
       return;
     }
+
+    Editor.init({
+      onChange: refresh,
+      countryNames: globe.land.map(f => f.properties.name).sort(),
+    });
 
     refresh();
 

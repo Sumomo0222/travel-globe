@@ -521,21 +521,35 @@ window.ATLAS = (function () {
     }
   ];
 
-  /* 便捷访问 */
-  const allCities = [];
-  trips.forEach(t => t.cities.forEach(c => { c.trip = t; allCities.push(c); }));
+  /* ============ 可变数据层：派生数据 / 本地保存 / 恢复默认 ============ */
+  const STORAGE_KEY = 'tg-archive-v1';
+  const DEFAULT_TRIPS = JSON.parse(JSON.stringify(trips));  // 立即快照，避免编辑污染默认数据
+  let _trips = trips, allCities = [], countries = {}, years = [];
 
-  const countries = {};
-  allCities.forEach(c => {
-    if (!countries[c.countryEn]) countries[c.countryEn] = { zh: c.country, continent: c.continent, count: 0 };
-    countries[c.countryEn].count++;
-  });
+  function rebuildDerived() {
+    allCities = [];
+    countries = {};
+    _trips.forEach(t => t.cities.forEach(c => {
+      c.trip = t;
+      allCities.push(c);
+      if (!countries[c.countryEn]) countries[c.countryEn] = { zh: c.country, continent: c.continent, count: 0 };
+      countries[c.countryEn].count++;
+    }));
+    years = [...new Set(_trips.map(t => t.year))].sort((a, b) => b - a);
+  }
+  rebuildDerived();
 
-  const years = [...new Set(trips.map(t => t.year))].sort((a, b) => b - a);
+  /* 序列化时剥离循环引用 (city.trip) */
+  const clean = () => JSON.parse(JSON.stringify(_trips, (k, v) => k === 'trip' ? undefined : v));
 
-  return {
-    trips, cities: allCities, countries,
-    years, themes: THEMES, themeIcons: THEME_ICONS, yearColors: YEAR_COLORS,
+  const api = {
+    get trips() { return _trips; },
+    get cities() { return allCities; },
+    get countries() { return countries; },
+    get years() { return years; },
+    themes: THEMES, themeIcons: THEME_ICONS, yearColors: YEAR_COLORS,
+    STORAGE_KEY,
+
     /* 大圆弧距离 (km) */
     distance(a, b) {
       const R = 6371;
@@ -544,6 +558,40 @@ window.ATLAS = (function () {
       const dLat = (la2 - la1) * rad, dLon = (lo2 - lo1) * rad;
       const s = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin(dLon / 2) ** 2;
       return 2 * R * Math.asin(Math.sqrt(s));
-    }
+    },
+
+    /* 编辑器调用：整体替换旅程数组并重建派生数据 */
+    replaceTrips(next) {
+      _trips = next;
+      rebuildDerived();
+    },
+
+    /* 增删改后调用：刷新派生数据（allCities/countries/years） */
+    rebuildDerived,
+
+    persist() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(clean())); } catch (_) {}
+    },
+    hasSaved() { try { return !!localStorage.getItem(STORAGE_KEY); } catch (_) { return false; } },
+    loadSaved() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const next = JSON.parse(raw);
+        if (!Array.isArray(next) || !next.length) return false;
+        _trips = next;
+        rebuildDerived();
+        return true;
+      } catch (_) { return false; }
+    },
+    clearSaved() { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} },
+    resetToDefault() {
+      this.clearSaved();
+      _trips = JSON.parse(JSON.stringify(DEFAULT_TRIPS));
+      rebuildDerived();
+    },
+    exportJSON() { return JSON.stringify(clean(), null, 2); }
   };
+
+  return api;
 })();
